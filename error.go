@@ -91,3 +91,11 @@ func (es *Errors) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(errs)
 }
+
+func (es *Errors) FirstError() (string, error) {
+	for _, key := range es.Keys() {
+		value, _ := es.Get(key)
+		return key, value.(error)
+	}
+	return "", nil
+}
