@@ -82,15 +82,15 @@ func Validate(value interface{}, rules ...Rule) error {
 
 // validateMap validates a map of validatable elements
 func validateMap(rv reflect.Value) error {
-	errs := Errors{}
+	errs := NewErrors()
 	for _, key := range rv.MapKeys() {
 		if mv := rv.MapIndex(key).Interface(); mv != nil {
 			if err := mv.(Validatable).Validate(); err != nil {
-				errs[fmt.Sprintf("%v", key.Interface())] = err
+				errs.Set(fmt.Sprintf("%v", key.Interface()), err)
 			}
 		}
 	}
-	if len(errs) > 0 {
+	if len(errs.Keys()) > 0 {
 		return errs
 	}
 	return nil
@@ -98,16 +98,16 @@ func validateMap(rv reflect.Value) error {
 
 // validateMap validates a slice/array of validatable elements
 func validateSlice(rv reflect.Value) error {
-	errs := Errors{}
+	errs := NewErrors()
 	l := rv.Len()
 	for i := 0; i < l; i++ {
 		if ev := rv.Index(i).Interface(); ev != nil {
 			if err := ev.(Validatable).Validate(); err != nil {
-				errs[strconv.Itoa(i)] = err
+				errs.Set(strconv.Itoa(i), err)
 			}
 		}
 	}
-	if len(errs) > 0 {
+	if len(errs.Keys()) > 0 {
 		return errs
 	}
 	return nil

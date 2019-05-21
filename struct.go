@@ -70,7 +70,7 @@ func ValidateStruct(structPtr interface{}, fields ...*FieldRules) error {
 	}
 	value = value.Elem()
 
-	errs := Errors{}
+	errs := NewErrors()
 
 	for i, fr := range fields {
 		fv := reflect.ValueOf(fr.fieldPtr)
@@ -87,18 +87,19 @@ func ValidateStruct(structPtr interface{}, fields ...*FieldRules) error {
 			}
 			if ft.Anonymous {
 				// merge errors from anonymous struct field
-				if es, ok := err.(Errors); ok {
-					for name, value := range es {
-						errs[name] = value
+				if es, ok := err.(*Errors); ok {
+					for _, name := range es.Keys() {
+						value, _ := es.Get(name)
+						errs.Set(name, value)
 					}
 					continue
 				}
 			}
-			errs[getErrorFieldName(ft)] = err
+			errs.Set(getErrorFieldName(ft), err)
 		}
 	}
 
-	if len(errs) > 0 {
+	if len(errs.Keys()) > 0 {
 		return errs
 	}
 	return nil

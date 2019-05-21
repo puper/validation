@@ -7,12 +7,15 @@ package validation
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+
+	"github.com/puper/orderedmap"
 )
 
 type (
 	// Errors represents the validation errors that are indexed by struct field names, map or slice keys.
-	Errors map[string]error
+	Errors struct {
+		orderedmap.OrderedMap
+	}
 
 	// InternalError represents an error that should NOT be treated as a validation error.
 	InternalError interface {
@@ -25,6 +28,12 @@ type (
 	}
 )
 
+func NewErrors() *Errors {
+	return &Errors{
+		OrderedMap: *orderedmap.New(),
+	}
+}
+
 // NewInternalError wraps a given error into an InternalError.
 func NewInternalError(err error) InternalError {
 	return &internalError{error: err}
@@ -36,54 +45,49 @@ func (e *internalError) InternalError() error {
 }
 
 // Error returns the error string of Errors.
-func (es Errors) Error() string {
-	if len(es) == 0 {
+func (es *Errors) Error() string {
+	if len(es.Keys()) == 0 {
 		return ""
 	}
-
-	keys := []string{}
-	for key := range es {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
 	s := ""
-	for i, key := range keys {
+	for i, key := range es.Keys() {
 		if i > 0 {
 			s += "; "
 		}
-		if errs, ok := es[key].(Errors); ok {
+		tmp, _ := es.Get(key)
+		if errs, ok := tmp.(*Errors); ok {
 			s += fmt.Sprintf("%v: (%v)", key, errs)
 		} else {
-			s += fmt.Sprintf("%v: %v", key, es[key].Error())
+			s += fmt.Sprintf("%v: %v", key, tmp.(error).Error())
 		}
 	}
 	return s + "."
 }
 
-// MarshalJSON converts the Errors into a valid JSON.
-func (es Errors) MarshalJSON() ([]byte, error) {
-	errs := map[string]interface{}{}
-	for key, err := range es {
-		if ms, ok := err.(json.Marshaler); ok {
-			errs[key] = ms
-		} else {
-			errs[key] = err.Error()
-		}
-	}
-	return json.Marshal(errs)
-}
-
 // Filter removes all nils from Errors and returns back the updated Errors as an error.
 // If the length of Errors becomes 0, it will return nil.
-func (es Errors) Filter() error {
-	for key, value := range es {
+func (es *Errors) Filter() error {
+	for _, key := range es.Keys() {
+		value, _ := es.Get(key)
 		if value == nil {
-			delete(es, key)
+			es.Delete(key)
 		}
 	}
-	if len(es) == 0 {
+	if len(es.Keys()) == 0 {
 		return nil
 	}
 	return es
+}
+
+func (es *Errors) MarshalJSON() ([]byte, error) {
+	errs := orderedmap.New()
+	for _, key := range es.Keys() {
+		err, _ := es.Get(key)
+		if ms, ok := err.(json.Marshaler); ok {
+			errs.Set(key, ms)
+		} else {
+			errs.Set(key, err.(error).Error())
+		}
+	}
+	return json.Marshal(errs)
 }
